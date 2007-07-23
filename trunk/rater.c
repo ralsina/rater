@@ -15,11 +15,12 @@
 
 /* Struct describing a limit key.
  * 
- * A key belongs to a class, and contains
- * a time/count pair (ex. 10 times in 90 seconds)
+ * A key belongs to a class (see below), and contains
+ * a count/time pair (ex. 10 times in 90 seconds)
  * and a name that's matched using fnmatch
  * against the client-provided data
  */
+
 typedef struct rkey_t
 {
   const char *name;
@@ -34,9 +35,9 @@ typedef struct rkey_t
  * A class is simply a container of keys,
  * so you can have the same key for different
  * purposes. (ex. joe as a username or joe as a hostname
- * is joe in two different classes.
+ * is joe in two different classes.)
  *
- * Each class has a name.
+ * Each class has a name and a linked list of keys.
  */
 
 typedef struct class_t
@@ -89,11 +90,19 @@ check_rate (void *count, int columns, char **result, char **colnames)
   return 0;
 }
 
+/* Store a mark in the DB for this value and class
+ * timestamped now.
+ * 
+ * Takes as argument a value and a class.
+ * For example, class could be "ip" and value "10.0.0.4"
+ * these marks are what's counted later to decide if
+ * the rate for this value and class is exceeded
+ * or not
+ */
+
 void
 mark (const char *value, const char *class)
 {
-  // Store a mark in the DB for this value and class
-  // timestamped now
 
   char *zErrMsg = 0;
   bstring query =
@@ -111,6 +120,28 @@ mark (const char *value, const char *class)
   }
   bdestroy (query);
 }
+
+/* rate
+ *
+ * Takes as argument a buffer containing a line of the form
+ * class value
+ * and must decide if that combination is over rate or not.
+ * 
+ * Returns the response message in the msg parameter in this form:
+ *
+ * If rate is not exceeded, and this is the first of ten allowed marks:
+ *
+ * 0 1/10 
+ *
+ * If rate is exceeded and this is the 12th of 10 allowed marks:
+ *
+ * 1 12/10
+ *
+ * If there was an error:
+ *
+ * 2 Error message here.
+ *
+ */
 
 int
 rate (char *buffer, bstring * msg)
@@ -188,7 +219,6 @@ rate (char *buffer, bstring * msg)
 	}
 	break;
       }
-
       key = key->next;
     }
 
@@ -198,10 +228,20 @@ rate (char *buffer, bstring * msg)
     UT_LOG (Info, "Class not found %s", buffer);
     bassignformat (*msg, "2 Class not found: %s", buffer);
   }
-
   bdestroy (value);
   return 1;
 }
+
+
+/* handle
+ *
+ * The network event handler.
+ * 
+ * Keeps a per-descriptor buffer allocated.
+ * When the buffer contains a whole line, it calls rate (buffer,msg)
+ * Then sends msg over the descriptor and closes it.
+ * 
+ */
 
 int
 handle (int fd, char *name, int flags, void *b)
@@ -269,14 +309,17 @@ handle (int fd, char *name, int flags, void *b)
 }
 
 
+/* init_sql 
+ *
+ * Initialize the in-memory SQL DB.
+ *
+ */
 void
 init_sql ()
 {
   char *zErrMsg = 0;
 
   int rc = sqlite3_open (":memory:", &db);
-
-//  int rc = sqlite3_open ("db", &db);
 
   if (rc)
   {
@@ -296,11 +339,22 @@ init_sql ()
   }
 }
 
+/* close_sql
+ *
+ * Close the SQL DB
+ */
+
 void
 close_sql ()
 {
   sqlite3_close (db);
 }
+
+/* config_error
+ *
+ * Handle configuration errors by logging and dying.
+ *
+ */
 
 void
 config_error ()
@@ -308,6 +362,13 @@ config_error ()
   UT_LOG (Fatal, "Config error in line %d: %s",
 	  config_error_line (&conf), config_error_text (&conf));
 }
+
+/* init_config
+ *
+ * Parses configuration file and loads classes and keys into the 
+ * proper data structures.
+ *
+ */
 
 void
 init_config ()
@@ -333,6 +394,7 @@ init_config ()
       break;
     char *cname = config_setting_name (cl);
 
+    //TODO: remove arbitrary limit
     if (strlen (cname) > 49)
     {
       UT_LOG (Fatal, "Class name exceeds 50 characters: %s", cname);
@@ -366,6 +428,12 @@ init_config ()
 
   }
 }
+
+/* main
+ * 
+ * Initialize everything and enter the event loop.
+ *
+ */
 
 int
 main (int argc, char **argv)
