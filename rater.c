@@ -54,12 +54,40 @@ sqlite3 *db;
 config_t conf;
 class_t *class_list = NULL;
 class_t *class_tmp = NULL;
+unsigned long too_old = 30;
 
 // Global constants
 
 struct tagbstring sq = bsStatic ("'");
 struct tagbstring dq = bsStatic ("''");
 
+/* clean_old_marks
+ *
+ * Called by a timer, it removes all marks older than
+ * (global) too_old seconds.
+ *
+ */
+
+int
+clean_old_marks (char *name, unsigned msec, void *data)
+{
+  UT_LOG (Info, "Starting cleanup");
+  char *zErrMsg = 0;
+  bstring query = bformat ("DELETE FROM 'items' where timestamp < %ld;",
+			   time (NULL) - too_old);
+
+  UT_LOG (Info, "SQL: %s", query->data);
+  int rc = sqlite3_exec (db, query->data, 0, 0, &zErrMsg);
+
+  if (rc != SQLITE_OK)
+  {
+    UT_LOG (Error, "SQL error: %s\n", zErrMsg);
+    sqlite3_free (zErrMsg);
+  }
+  bdestroy (query);
+  UT_LOG (Info, "Ending cleanup");
+  return 0;
+}
 
 /* signal_handler
  *
@@ -152,6 +180,7 @@ rate (char *buffer, bstring * msg)
   if (!sp)
   {
     UT_LOG (Info, "2 Bad Input (no space)");
+    bassignformat (*msg, "2 Bad Input (no space)");
     return 1;
   }
 
@@ -425,8 +454,11 @@ init_config ()
       // Then add it to the linked list for the class
       LL_ADD (cls->keys, tmp, key);
     }
-
   }
+
+  // Set the cleanup timer
+  // TODO:Make it configurable
+  UT_tmr_set ("cleanup", 30000, clean_old_marks, NULL);
 }
 
 /* main
