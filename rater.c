@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <time.h>
 #include <fnmatch.h>
+#include <signal.h>
 
 #include <libut/ut.h>
 #include <sqlite3.h>
@@ -99,7 +100,7 @@ clean_old_marks (char *name, unsigned msec, void *data)
  */
 int
 signal_handler (int signum)
-{
+{  
   sqlite3_close (db);
   config_destroy(&conf);  
   UT_LOG (Fatal, "Got Signal %d", signum);
@@ -258,6 +259,7 @@ rate (char *buffer, bstring * msg)
     UT_LOG (Info, "Class not found %s", buffer);
     bassignformat (*msg, "2 Class not found: %s", buffer);
   }
+  bdestroy (cl);
   bdestroy (value);
   return 1;
 }
@@ -276,14 +278,13 @@ rate (char *buffer, bstring * msg)
 int
 handle (int fd, char *name, int flags, void *b)
 {
-  char *buffer = (char *) b;
+  bstring buffer=(bstring) b;
   int rc;
   char buf[100];
 
   if (flags & UTFD_IS_NEWACCEPT)
   {
-    /* New connection, keep 1024 char buffer */
-    buffer = (char *) calloc (1024, sizeof (char));
+    buffer=bfromcstr("");
     UT_fd_cntl (fd, UTFD_SET_DATA, buffer);
     return 0;
   }
@@ -291,7 +292,7 @@ handle (int fd, char *name, int flags, void *b)
   /* socket is readable */
   while ((rc = read (fd, buf, 100)) > 0)
   {
-    int count = strlen (buffer) + rc;
+    int count = buffer->slen + rc;
 
     if (count > 1000)
     {
@@ -300,7 +301,7 @@ handle (int fd, char *name, int flags, void *b)
       UT_fd_write (fd, "1 Line is too long\r\n", 20);
       UT_fd_unreg (fd);
       close (fd);
-      free (buffer);
+      bdestroy (buffer);
       return 0;
     }
     // Search for \n
@@ -308,23 +309,23 @@ handle (int fd, char *name, int flags, void *b)
 
     if (el)
     {
-      *(el - 1) = 0;
-      strncat (buffer, buf, rc);
+      rc=el-buf;
+      bcatblk (buffer, buf,rc);
       UT_LOG (Info, "Checking %s", buffer);
       bstring msg = bfromcstr ("");
 
-      rate (buffer, &msg);
+      rate (buffer->data, &msg);
+      bcatcstr(msg,"\r\n");
       UT_fd_write (fd, msg->data, msg->slen);
       bdestroy (msg);
-      UT_fd_write (fd, "\r\n", 2);
       UT_fd_unreg (fd);
       close (fd);
-      free (buffer);
+      bdestroy (buffer);
       return 0;
     }
     else
     {
-      strncat (buffer, buf, rc);
+      bcatcstr (buffer, buf);
     }
   }
   if (rc == 0 || (rc == -1 && errno != EINTR && errno != EAGAIN))
@@ -332,7 +333,7 @@ handle (int fd, char *name, int flags, void *b)
     UT_LOG (Info, "%s", strerror (errno));
     UT_fd_unreg (fd);
     close (fd);
-    free (buffer);
+    bdestroy (buffer);
   }
   return 0;
 
@@ -460,7 +461,7 @@ init_config ()
 int
 main (int argc, char **argv)
 {
-  UT_init (INIT_END);
+  UT_init (INIT_SIGNALS(SIGINT,SIGQUIT,SIGTERM),INIT_END);
   UT_signal_reg (signal_handler);
   init_sql ();
   init_config ();
