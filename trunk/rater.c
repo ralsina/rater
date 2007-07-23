@@ -100,9 +100,9 @@ clean_old_marks (char *name, unsigned msec, void *data)
  */
 int
 signal_handler (int signum)
-{  
+{
   sqlite3_close (db);
-  config_destroy(&conf);  
+  config_destroy (&conf);
   UT_LOG (Fatal, "Got Signal %d", signum);
   return 0;
 }
@@ -120,14 +120,14 @@ check_rate (void *count, int columns, char **result, char **colnames)
   return 0;
 }
 
-/* Store a mark in the DB for this value and class
+/* Store a mark in the DB for this value and class,
  * timestamped now.
  * 
  * Takes as argument a value and a class.
  * For example, class could be "ip" and value "10.0.0.4"
  * these marks are what's counted later to decide if
  * the rate for this value and class is exceeded
- * or not
+ * or not.
  */
 
 void
@@ -154,10 +154,12 @@ mark (const char *value, const char *class)
 /* rate
  *
  * Takes as argument a buffer containing a line of the form
- * class value
+ *
+ * class value 
+ *
  * and must decide if that combination is over rate or not.
  * 
- * Returns the response message in the msg parameter in this form:
+ * Returns the response message in the msg parameter in these forms:
  *
  * If rate is not exceeded, and this is the first of ten allowed marks:
  *
@@ -278,13 +280,13 @@ rate (char *buffer, bstring * msg)
 int
 handle (int fd, char *name, int flags, void *b)
 {
-  bstring buffer=(bstring) b;
+  bstring buffer = (bstring) b;
   int rc;
   char buf[100];
 
   if (flags & UTFD_IS_NEWACCEPT)
   {
-    buffer=bfromcstr("");
+    buffer = bfromcstr ("");
     UT_fd_cntl (fd, UTFD_SET_DATA, buffer);
     return 0;
   }
@@ -309,13 +311,13 @@ handle (int fd, char *name, int flags, void *b)
 
     if (el)
     {
-      rc=el-buf;
-      bcatblk (buffer, buf,rc);
+      rc = el - buf;
+      bcatblk (buffer, buf, rc);
       UT_LOG (Info, "Checking %s", buffer);
       bstring msg = bfromcstr ("");
 
       rate (buffer->data, &msg);
-      bcatcstr(msg,"\r\n");
+      bcatcstr (msg, "\r\n");
       UT_fd_write (fd, msg->data, msg->slen);
       bdestroy (msg);
       UT_fd_unreg (fd);
@@ -461,7 +463,7 @@ init_config ()
 int
 main (int argc, char **argv)
 {
-  UT_init (INIT_SIGNALS(SIGINT,SIGQUIT,SIGTERM),INIT_END);
+  UT_init (INIT_SIGNALS (SIGINT, SIGQUIT, SIGTERM), INIT_END);
   UT_signal_reg (signal_handler);
   init_sql ();
   init_config ();
