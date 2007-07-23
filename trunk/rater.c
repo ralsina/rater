@@ -17,12 +17,12 @@
  * 
  * A key belongs to a class, and contains
  * a time/count pair (ex. 10 times in 90 seconds)
- * and a wildcard that's matched using fnmatch
+ * and a name that's matched using fnmatch
  * against the client-provided data
  */
 typedef struct rkey_t
 {
-  const char *wildcard;
+  const char *name;
   bstring report;
   long time;
   long count;
@@ -36,15 +36,14 @@ typedef struct rkey_t
  * purposes. (ex. joe as a username or joe as a hostname
  * is joe in two different classes.
  *
- * Each class has an id of at most 50 characters.
+ * Each class has a name.
  */
 
 typedef struct class_t
 {
-  char *id;
+  char *name;
   struct class_t *next;
   struct rkey_t *keys;
-  UT_hash_handle hh;
 } class_t;
 
 
@@ -134,8 +133,8 @@ rate (char *buffer, bstring * msg)
   bfindreplace (cl, &sq, &dq, 0);
 
   UT_LOG (Info, "%s -- %s", cl->data, value->data);
-  class_tmp=NULL;
-  HASH_FIND_STR (class_list, class_tmp, id, cl->data);
+  class_tmp = NULL;
+  LL_FIND (class_list, class_tmp, cl->data);
   if (class_tmp)		// Found it
   {
     UT_LOG (Info, "Class found");
@@ -146,11 +145,11 @@ rate (char *buffer, bstring * msg)
 
     while (key)
     {
-      UT_LOG (Info, "Key: %s", key->wildcard);
-      if (0 == fnmatch (key->wildcard, value->data, 0))
+      UT_LOG (Info, "Key: %s", key->name);
+      if (0 == fnmatch (key->name, value->data, 0))
       {
 	UT_LOG (Info, "Match: %s -- %s %ld %ld", value->data,
-		key->wildcard, key->time, key->count);
+		key->name, key->time, key->count);
 	// Add mark for current check
 	mark (value->data, cl->data);
 	// And now see if we are over limited rate
@@ -339,12 +338,12 @@ init_config ()
       UT_LOG (Fatal, "Class name exceeds 50 characters: %s", cname);
     }
     class_t *cls = (class_t *) calloc (1, sizeof (class_t));
-    cls->id = (char *) calloc (50, sizeof (char));
-    strcpy (cls->id, cname);
+    cls->name = (char *) calloc (50, sizeof (char));
+    strcpy (cls->name, cname);
     cls->keys = NULL;
     class_tmp = NULL;
     UT_LOG (Info, "class: %s", cname);
-    HASH_ADD_STR (class_list, class_tmp, id, cls);
+    LL_ADD (class_list, class_tmp, cls);
     int j = 0;
 
     for (;; j++)		// Iterate over limits for this class
@@ -358,7 +357,7 @@ init_config ()
 
       key->time = config_setting_get_int_elem (skey, 1);
       key->count = config_setting_get_int_elem (skey, 2);
-      key->wildcard = config_setting_get_string_elem (skey, 0);
+      key->name = config_setting_get_string_elem (skey, 0);
       key->next = NULL;
 
       // Then add it to the linked list for the class
