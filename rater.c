@@ -101,6 +101,7 @@ int
 signal_handler (int signum)
 {
   sqlite3_close (db);
+  config_destroy(&conf);  
   UT_LOG (Fatal, "Got Signal %d", signum);
   return 0;
 }
@@ -368,17 +369,6 @@ init_sql ()
   }
 }
 
-/* close_sql
- *
- * Close the SQL DB
- */
-
-void
-close_sql ()
-{
-  sqlite3_close (db);
-}
-
 /* config_error
  *
  * Handle configuration errors by logging and dying.
@@ -476,5 +466,4 @@ main (int argc, char **argv)
   init_config ();
   UT_net_listen ("query", "127.0.0.1:1999", handle, NULL);
   UT_event_loop ();
-  close_sql ();
 }
