@@ -1,3 +1,10 @@
+settings : {
+	address: "0.0.0.0";
+        port: 1999;
+        expiration_timer: 180;
+        db_path: ":memory:";
+}
+
 limits : {
 	user: (
         	("rosario",90,20),
