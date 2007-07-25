@@ -27,13 +27,62 @@ settings : {
         // Default: ":memory:" for in-memory DB. 
         db_path: ":memory:";
         
+        // Full path to logfile. Use /dev/stderr if you want to 
+        // log to stderr (for runit or daemontools)
+        log: "/dev/stderr";
+        
+        // Log level. Possible levels are
+        // 0 (Fatal), 1 (Error), 2 (Warning), 3 (Info), 4 (Debug)
+        // Default: 3
+        log_level: 3;
 };
 
+/* 
+ The limits section contains the specifics of what you want to 
+ limit and to what rates it should be limited.
+ 
+ This section contains "classes" and each class contains "keys".
+
+ A key is of the form ("wildcard",time,count) and means
+ that things that match the wildcard are limited to count marks
+ every time seconds.
+ 
+ Only the first matching wildcard is used, so put the defaults 
+ at the end,
+ 
+ Here's an example:
+
+	// The user class 
+	user: (
+        	// A key: if the user matches rosario, it can do
+                // 20 marks every 90 seconds.
+        	("rosario",90,20),
+
+                // ralsina can do 10 marks every 90 seconds
+        	("ralsina",90,10),
+
+                // everyone else can do 2 marks every 30 seconds.
+                ("*",30,2)
+                
+              );
+              
+        // The ip class
+	ip: (
+        	// Matches addresses starting with 10.0.0.
+        	("10.0.0.*",90 , 20),
+        	// Matches addresses starting with 10.0.1.
+        	("10.0.1.*",90 , 20),
+                // Matches all addresses
+        	("*",10 , 1)
+            );
+ 
+ */
+ 
 limits : {
 	user: (
         	("rosario",90,20),
         	("ralsina",90,10),
-                ("*",2,10)
+                ("*",30,2)
               );
 	ip: (
         	("10.0.0.*",90 , 20),

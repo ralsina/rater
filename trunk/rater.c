@@ -62,6 +62,8 @@ long int port = 0;
 const char *control_address = 0;
 long int control_port = 0;
 long int expiration_timer = 0;
+const char *log=0;
+long int log_level=0;
 
 
 // Global constants
@@ -70,6 +72,7 @@ struct tagbstring sq = bsStatic ("'");
 struct tagbstring dq = bsStatic ("''");
 const char *loopback = "127.0.0.1";
 const char *memory_db = ":memory:";
+const char *dev_stderr = "/dev/stderr";
 
 /* clean_old_marks
  *
@@ -365,9 +368,8 @@ init_sql ()
 
   if (rc)
   {
-    fprintf (stderr, "Can't open database: %s\n", sqlite3_errmsg (db));
+    UT_LOG (Fatal, "Can't open database: %s\n", sqlite3_errmsg (db));
     sqlite3_close (db);
-    UT_LOG (Fatal, "Error opening DB");
   }
   rc = sqlite3_exec (db, "BEGIN TRANSACTION; "
 		     "CREATE TABLE items (class TEXT, id INTEGER PRIMARY KEY, value TEXT, timestamp NUMERIC);"
@@ -420,6 +422,16 @@ init_config ()
     db_path = config_setting_get_string (t);
   }
 
+  if (t = config_lookup (&conf, "settings.log"))
+  {
+    log = config_setting_get_string (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.log_level"))
+  {
+    log_level = config_setting_get_int (t);
+  }
+
   if (t = config_lookup (&conf, "settings.address"))
   {
     address = config_setting_get_string (t);
@@ -454,6 +466,10 @@ init_config ()
 
   if (!db_path)
     db_path = memory_db;
+  if (!log)
+    log = dev_stderr;
+  if (!log_level)
+    log_level = 3;
   if (!control_address)
     control_address = loopback;
   if (!control_port)
@@ -537,7 +553,7 @@ main (int argc, char **argv)
   bstring listening = bformat ("%s:%ld", control_address, control_port);
 
   UT_init (INIT_SIGNALS (SIGINT, SIGQUIT, SIGTERM), INIT_SHL_IPPORT,
-	   listening->data, INIT_END);
+	   listening->data, INIT_LOGFILE, log, INIT_LOGLEVEL, log_level, INIT_END);
   bdestroy (listening);
 
   // Setup signal handler
