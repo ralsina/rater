@@ -1,11 +1,32 @@
 settings : {
+	// Address to listen. Use 0.0.0.0 for all addresses. 
+        // Default "127.0.0.1"
 	address: "127.0.0.1";
+
+        // Port to listen for connections.
+        // Default: 1999
         port: 1999;
+        
+        // Address to listen for control connections
+        // Default "127.0.0.1"        
         control_address: "127.0.0.1";
-        control_port: 4446;
+        
+        // Port to listen for control connections.
+        // Default: 4445        
+        control_port: 4445;
+        
+        // Expire old marks every N seconds
+        // Default: 180
         expiration_timer: 180;
+        
+        // Delete marks older than N seconds
+        // Default: 90
         max_age: 90;
+        
+        // Path to the SQLite DB file.
+        // Default: ":memory:" for in-memory DB. 
         db_path: ":memory:";
+        
 };
 
 limits : {
