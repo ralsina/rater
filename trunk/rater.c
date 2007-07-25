@@ -84,12 +84,12 @@ const char *dev_stderr = "/dev/stderr";
 int
 clean_old_marks (char *name, unsigned msec, void *data)
 {
-  UT_LOG (Info, "Starting cleanup");
+  UT_LOG (Debug, "Starting cleanup");
   char *zErrMsg = 0;
   bstring query = bformat ("DELETE FROM 'items' where timestamp < %ld;",
 			   time (NULL) - max_age);
 
-  UT_LOG (Info, "SQL: %s", query->data);
+  UT_LOG (Debug, "SQL: %s", query->data);
   int rc = sqlite3_exec (db, query->data, 0, 0, &zErrMsg);
 
   if (rc != SQLITE_OK)
@@ -98,7 +98,7 @@ clean_old_marks (char *name, unsigned msec, void *data)
     sqlite3_free (zErrMsg);
   }
   bdestroy (query);
-  UT_LOG (Info, "Ending cleanup");
+  UT_LOG (Debug, "Ending cleanup");
   return 0;
 }
 
@@ -152,7 +152,7 @@ mark (const char *value, const char *class)
 		   "VALUES ('%s','%s','%ld');",
 		   value, class, time (NULL));
 
-  UT_LOG (Info, "SQL: %s", query->data);
+  UT_LOG (Debug, "SQL: %s", query->data);
   int rc = sqlite3_exec (db, query->data, 0, 0, &zErrMsg);
 
   if (rc != SQLITE_OK)
@@ -208,12 +208,12 @@ rate (char *buffer, bstring * msg)
   bfindreplace (value, &sq, &dq, 0);
   bfindreplace (cl, &sq, &dq, 0);
 
-  UT_LOG (Info, "%s -- %s", cl->data, value->data);
+  UT_LOG (Debug, "Input: %s , %s", cl->data, value->data);
   class_tmp = NULL;
   LL_FIND (class_list, class_tmp, cl->data);
   if (class_tmp)		// Found it
   {
-    UT_LOG (Info, "Class found");
+    UT_LOG (Debug, "Class found");
 
     // Iterate over keys trying to match the given string
 
@@ -221,10 +221,9 @@ rate (char *buffer, bstring * msg)
 
     while (key)
     {
-      UT_LOG (Info, "Key: %s", key->name);
       if (0 == fnmatch (key->name, value->data, 0))
       {
-	UT_LOG (Info, "Match: %s -- %s %ld %ld", value->data,
+	UT_LOG (Debug, "Match: %s -- %s %ld %ld", value->data,
 		key->name, key->time, key->count);
 	// Add mark for current check
 	mark (value->data, cl->data);
@@ -238,7 +237,7 @@ rate (char *buffer, bstring * msg)
 		 value->data, check_from);
 	char *zErrMsg = 0;
 
-	UT_LOG (Info, "SQL: %s", query->data);
+	UT_LOG (Debug, "SQL: %s", query->data);
 	long count;
 	int rc = sqlite3_exec (db, query->data, check_rate, &count, &zErrMsg);
 
@@ -270,7 +269,7 @@ rate (char *buffer, bstring * msg)
   }
   else
   {
-    UT_LOG (Info, "Class not found %s", buffer);
+    UT_LOG (Error, "Class not found %s", buffer);
     bassignformat (*msg, "2 Class not found: %s", buffer);
   }
   bdestroy (cl);
@@ -325,7 +324,7 @@ handle (int fd, char *name, int flags, void *b)
     {
       rc = el - buf;
       bcatblk (buffer, buf, rc);
-      UT_LOG (Info, "Checking %s", buffer);
+      UT_LOG (Debug, "Checking %s", buffer);
       bstring msg = bfromcstr ("");
 
       rate (buffer->data, &msg);
