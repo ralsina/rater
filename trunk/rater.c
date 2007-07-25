@@ -530,7 +530,10 @@ init_config ()
 int
 main (int argc, char **argv)
 {
+  // Parse config file
   init_config ();
+
+  // Initialize libut
   bstring listening = bformat ("%s:%ld", control_address, control_port);
 
   UT_init (INIT_SIGNALS (SIGINT, SIGQUIT, SIGTERM), INIT_SHL_IPPORT,
