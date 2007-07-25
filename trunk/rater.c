@@ -55,17 +55,26 @@ sqlite3 *db;
 config_t conf;
 class_t *class_list = NULL;
 class_t *class_tmp = NULL;
-unsigned long too_old = 30;
+unsigned long max_age = 30;
+const char *db_path = 0;
+const char *address = 0;
+long int port = 0;
+const char *control_address = 0;
+long int control_port = 0;
+long int expiration_timer = 0;
+
 
 // Global constants
 
 struct tagbstring sq = bsStatic ("'");
 struct tagbstring dq = bsStatic ("''");
+const char *loopback = "127.0.0.1";
+const char *memory_db = ":memory:";
 
 /* clean_old_marks
  *
  * Called by a timer, it removes all marks older than
- * (global) too_old seconds.
+ * (global) max_age seconds.
  *
  */
 
@@ -75,7 +84,7 @@ clean_old_marks (char *name, unsigned msec, void *data)
   UT_LOG (Info, "Starting cleanup");
   char *zErrMsg = 0;
   bstring query = bformat ("DELETE FROM 'items' where timestamp < %ld;",
-			   time (NULL) - too_old);
+			   time (NULL) - max_age);
 
   UT_LOG (Info, "SQL: %s", query->data);
   int rc = sqlite3_exec (db, query->data, 0, 0, &zErrMsg);
@@ -385,6 +394,7 @@ config_error ()
 	  config_error_line (&conf), config_error_text (&conf));
 }
 
+
 /* init_config
  *
  * Parses configuration file and loads classes and keys into the 
@@ -400,6 +410,66 @@ init_config ()
   {
     config_error ();
   }
+
+  // Read basic configuration options
+
+  config_setting_t *t;
+
+  if (t = config_lookup (&conf, "settings.db_path"))
+  {
+    db_path = config_setting_get_string (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.address"))
+  {
+    address = config_setting_get_string (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.port"))
+  {
+    port = config_setting_get_int (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.control_address"))
+  {
+    control_address = config_setting_get_string (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.control_port"))
+  {
+    control_port = config_setting_get_int (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.expiration_timer"))
+  {
+    expiration_timer = config_setting_get_int (t);
+  }
+
+  if (t = config_lookup (&conf, "settings.max_age"))
+  {
+    max_age = config_setting_get_int (t);
+  }
+
+  // Use defaults if needed
+
+  if (!db_path)
+    db_path = memory_db;
+  if (!control_address)
+    control_address = loopback;
+  if (!control_port)
+    control_port = 1999;
+  if (!address)
+    address = loopback;
+  if (!port)
+    port = 1999;
+  if (!expiration_timer)
+    expiration_timer = 180;
+  if (!max_age)
+    expiration_timer = 90;
+
+  UT_LOG (Info, "Database: %s", db_path);
+  UT_LOG (Info, "Expire marks every %ld", expiration_timer);
+
   // get the limits group
   config_setting_t *limits = config_lookup (&conf, "limits");
 
@@ -449,9 +519,6 @@ init_config ()
     }
   }
 
-  // Set the cleanup timer
-  // TODO:Make it configurable
-  UT_tmr_set ("cleanup", 30000, clean_old_marks, NULL);
 }
 
 /* main
@@ -463,10 +530,27 @@ init_config ()
 int
 main (int argc, char **argv)
 {
-  UT_init (INIT_SIGNALS (SIGINT, SIGQUIT, SIGTERM), INIT_END);
-  UT_signal_reg (signal_handler);
-  init_sql ();
   init_config ();
-  UT_net_listen ("query", "127.0.0.1:1999", handle, NULL);
+  bstring listening = bformat ("%s:%ld", control_address, control_port);
+
+  UT_init (INIT_SIGNALS (SIGINT, SIGQUIT, SIGTERM), INIT_SHL_IPPORT,
+	   listening->data, INIT_END);
+  bdestroy (listening);
+
+  // Setup signal handler
+  UT_signal_reg (signal_handler);
+
+  // Setup SQL Db
+  init_sql ();
+
+  // Setup cleanup timer
+  UT_tmr_set ("cleanup", 1000 * expiration_timer, clean_old_marks, NULL);
+
+  // Start listening
+  listening = bformat ("%s:%ld", address, port);
+  UT_net_listen ("rater", listening->data, handle, NULL);
+  bdestroy (listening);
+
+  // Enter event loop
   UT_event_loop ();
 }
