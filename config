@@ -1,7 +1,10 @@
 settings : {
-	address: "0.0.0.0";
+	address: "127.0.0.1";
         port: 1999;
+        control_address: "127.0.0.1";
+        control_port: 4446;
         expiration_timer: 180;
+        max_age: 90;
         db_path: ":memory:";
 };
 
