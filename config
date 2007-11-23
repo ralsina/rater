@@ -34,7 +34,7 @@ settings : {
         // Log level. Possible levels are
         // 0 (Fatal), 1 (Error), 2 (Warning), 3 (Info), 4 (Debug)
         // Default: 3
-        log_level: 3;
+        log_level: 4;
 };
 
 /* 

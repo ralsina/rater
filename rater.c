@@ -213,7 +213,7 @@ rate (char *buffer, bstring * msg)
   LL_FIND (class_list, class_tmp, cl->data);
   if (class_tmp)		// Found it
   {
-    UT_LOG (Debug, "Class found");
+    UT_LOG (Debug, "Class found: %s",cl->data);
 
     // Iterate over keys trying to match the given string
 
@@ -528,6 +528,8 @@ init_config ()
       key->count = config_setting_get_int_elem (skey, 2);
       key->name = config_setting_get_string_elem (skey, 0);
       key->next = NULL;
+
+      UT_LOG (Debug, "Loaded Key: %s %d/%d",key->name,key->count,key->time);
 
       // Then add it to the linked list for the class
       LL_ADD (cls->keys, tmp, key);
